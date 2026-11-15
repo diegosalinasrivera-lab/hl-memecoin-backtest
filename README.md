@@ -233,6 +233,45 @@ régimen mixto de OKX, ni ajustando los filtros de selectividad (barrido
 de 42 combinaciones, 0 rentables). **No es una base para operar con
 dinero real** bajo ninguna de las configuraciones probadas.
 
+## Variante momentum (trend-following) — también probada, también pierde
+
+Ante la pregunta de si una hipótesis distinta (ir A FAVOR del tablero en
+vez de en contra) podría ser rentable, se implementó `strategy_momentum.py`
+/ `main_momentum.py`: mismo motor de backtest y gestión de riesgo, misma
+ventana de 12 meses de OKX, pero en vez de operar el "odd one out"
+(moneda que va contra la mayoría) se opera el "líder" (moneda que va más
+a favor de la mayoría), y en vez de "fade" de vela fuerte se sigue la
+continuación del movimiento.
+
+| Leverage | Momentum | Mean-reversion (original) |
+|---|---|---|
+| 3x  | **-99.9998%** | -97.4% |
+| 5x  | **-100.0%**   | -99.8% |
+| 25x | **-100.0%**   | -100.0% |
+
+**Momentum es peor, no mejor.** El filtro de "líder" (moneda a favor del
+tablero) se cumple con mucha más frecuencia que el de "odd one out"
+(moneda en contra, por definición más rara), generando 16.565 trades
+(vs. 4.723 del original) con el mismo ~36% de aciertos — más del triple
+de operaciones al mismo costo por operación, ruina total garantizada en
+los tres leverages. Ni siquiera en los meses alcistas da positivo: a 3x
+el PnL en régimen alcista es -$0.45 sobre 4054 trades, prácticamente
+plano pero nunca ganador.
+
+**Conclusión general (actualizada)**: ni la hipótesis de mean-reversion
+("apostar contra el que se desvía") ni la de momentum ("apostar con el
+líder del movimiento") tienen edge positivo en este universo de
+memecoins perpetuos de 15m, en ninguna de las ventanas de datos
+probadas (52 días Hyperliquid, 12 meses OKX), con ningún apalancamiento,
+y ajustando filtros de selectividad no cambia el signo del resultado.
+Buscar la rentabilidad probando más activos sobre la misma mecánica no
+es un camino razonable: con suficientes intentos, algún activo mostrará
+un resultado positivo por puro azar (comparaciones múltiples), sin que
+eso implique una ventaja real. Si se quiere seguir explorando, el
+siguiente paso razonable sería una lógica distinta (basada en
+liquidez, funding rate, correlación con BTC, o un horizonte de holding
+más largo), no repetir este mecanismo sobre más tickers.
+
 ## Cómo correrlo
 
 ```bash
