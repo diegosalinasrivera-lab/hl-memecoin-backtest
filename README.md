@@ -193,6 +193,46 @@ barrido nunca vio, (2) paper trading en vivo por varias semanas, y (3)
 sólo entonces capital chico y leverage bajo — nunca 25x sobre $146 en
 memecoins con un win rate real de ~31-36%.
 
+## Resultado con 12 meses reales (OKX) — confirmación final
+
+Con la fuente de datos OKX (`main_okx.py`, `config_okx.py`), se corrió el
+mismo motor de estrategia (filtros v2 con los umbrales por defecto:
+consenso 65%, desvío mínimo 0.6%) sobre **12 meses completos y reales**
+(35039 velas de 15m, 2025-11-15 a 2026-11-15), con régimen de mercado
+mixto: **9 meses bajistas, 3 alcistas**, ningún mes lateral puro.
+
+| Leverage | Capital final | Retorno total | Drawdown máx | # Trades | % Ganadores | % Stopped |
+|---|---|---|---|---|---|---|
+| 3x  | $3.74  | -97.4%  | -97.4%  | 4723 | 36.2% | 36.5% |
+| 5x  | $0.30  | -99.8%  | -99.8%  | 4723 | 36.2% | 36.5% |
+| 25x | ~$0.00 | -100.0% | -100.0% | 4723 | 36.2% | 36.5% |
+
+### Desglose por régimen (leverage 3x)
+
+| Régimen | PnL total | # Trades | % Ganadores |
+|---|---|---|---|
+| Alcista | -$6.61  | 1172 | 37.5% |
+| Bajista | -$121.68 | 3328 | 35.9% |
+| N/D (primer mes, sin baseline) | -$13.97 | 223 | 34.1% |
+
+**Esto descarta la hipótesis de que el resultado negativo con Hyperliquid
+era sólo producto de una muestra 100% bajista.** Con un año completo y
+régimen mixto (9 bajista / 3 alcista), **la estrategia pierde dinero en
+ambos regímenes** — mucho menos en el alcista (-$6.6 vs -$121.7), pero
+sigue siendo negativa incluso ahí. La prueba de robustez (sin mejor
+moneda / sin mejor día, ver `output_okx/robustness_*.csv`) confirma de
+nuevo que no es un resultado dependiente de un golpe de suerte puntual:
+quitando a TURBO (la moneda más rentable) o el mejor día individual, el
+retorno total empeora.
+
+**Conclusión general del proyecto**: la premisa de "tablero / odd one
+out" tal como fue especificada —comprar o vender la moneda que se mueve
+contra la mayoría— no tiene edge positivo en memecoins perpetuos de 15m,
+ni en la muestra corta bajista de Hyperliquid, ni en los 12 meses de
+régimen mixto de OKX, ni ajustando los filtros de selectividad (barrido
+de 42 combinaciones, 0 rentables). **No es una base para operar con
+dinero real** bajo ninguna de las configuraciones probadas.
+
 ## Cómo correrlo
 
 ```bash
