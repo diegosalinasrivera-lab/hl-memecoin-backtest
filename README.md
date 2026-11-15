@@ -159,6 +159,40 @@ un golpe de suerte puntual.
 - Ampliar la duración de la posición más allá de 1 vela, o usar un
   take-profit en vez de salir siempre al cierre de la vela siguiente.
 
+## Barrido de sensibilidad de los filtros v2 (`sweep_filters.py`)
+
+Para no quedarnos con un solo par de umbrales elegido a mano, se corrió
+un grid completo de 7×6 = 42 combinaciones de `MIN_BOARD_CONSENSUS`
+(50%-80%) × `MIN_ODD_ONE_OUT_DEVIATION` (0%-2.0%), con leverage 5x fijo,
+sobre los mismos datos de Hyperliquid (~52 días). Resultado completo en
+`output/sweep_filters.csv`.
+
+**Ninguna de las 42 combinaciones dio retorno positivo.** La mejor fue
+consenso=50% + desvío mínimo=2.0%: -10.5% de retorno (72 trades, 36% de
+ganadores) — la pérdida más chica de todo el grid, pero sigue siendo
+pérdida. En el otro extremo, sin filtro de desvío (0%) cualquier nivel de
+consenso vuelve a perder 93-100%, confirmando que el filtro de magnitud
+es el que más aporta.
+
+**Conclusión del barrido**: esto no es un problema de calibración de
+parámetros. Ajustar los umbrales reduce cuánto se pierde (de -96% a
+-10.5% en el mejor caso), pero no revierte el signo — la premisa de
+comprar/vender el "odd one out" contra el tablero no tiene edge positivo
+en esta muestra, sin importar qué tan selectivos sean los filtros.
+Además, elegir la "mejor" combinación mirando el mismo tramo de datos
+que se usa para evaluarla es sobreajuste (overfitting): no hay garantía
+de que esos umbrales sigan siendo los mejores fuera de esta muestra.
+
+**⚠️ Esto NO es una base para operar con dinero real.** El usuario
+planteó usar esta estrategia con capital real; dado que ninguna
+configuración probada hasta ahora es rentable (ni siquiera ajustando los
+parámetros a medida sobre los propios datos de prueba), la recomendación
+explícita fue no avanzar a ejecución real todavía. Antes de considerar
+capital real haría falta: (1) validar out-of-sample con datos que el
+barrido nunca vio, (2) paper trading en vivo por varias semanas, y (3)
+sólo entonces capital chico y leverage bajo — nunca 25x sobre $146 en
+memecoins con un win rate real de ~31-36%.
+
 ## Cómo correrlo
 
 ```bash

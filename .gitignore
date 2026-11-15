@@ -1,5 +1,9 @@
 data/
+data_okx/
 fetch_log.txt
+fetch_log_okx.txt
 run_log.txt
+run_log_v2.txt
+sweep_log.txt
 __pycache__/
 *.pyc

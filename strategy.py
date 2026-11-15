@@ -75,10 +75,21 @@ def build_board_frame(panel: dict[str, pd.DataFrame]) -> pd.DataFrame:
     return board
 
 
-def generate_signals(board: pd.DataFrame, coins: list[str]) -> list[Signal]:
+def generate_signals(
+    board: pd.DataFrame,
+    coins: list[str],
+    min_board_consensus: float = MIN_BOARD_CONSENSUS,
+    min_odd_one_out_deviation: float = MIN_ODD_ONE_OUT_DEVIATION,
+) -> list[Signal]:
     """Recorre el panel vela por vela y genera las señales de entrada según
     las reglas 1-4 descritas arriba. No aplica todavía gestión de riesgo
-    (eso lo hace el motor de backtest)."""
+    (eso lo hace el motor de backtest).
+
+    `min_board_consensus` y `min_odd_one_out_deviation` son los dos
+    filtros anti-sobre-trading del ajuste v2 (ver config.py); se exponen
+    como parámetros para poder barrerlos en `sweep_filters.py` sin tocar
+    el archivo de configuración.
+    """
     signals: list[Signal] = []
 
     n_coins = len(coins)
@@ -98,9 +109,9 @@ def generate_signals(board: pd.DataFrame, coins: list[str]) -> list[Signal]:
         # ajuste v2: el sesgo de tablero sólo cuenta si hay consenso fuerte
         # (>=MIN_BOARD_CONSENSUS de las monedas del mismo color), no con
         # una simple mayoría de 1 voto.
-        if n_green / n_coins >= MIN_BOARD_CONSENSUS:
+        if n_green / n_coins >= min_board_consensus:
             board_bias = "long"
-        elif n_red / n_coins >= MIN_BOARD_CONSENSUS:
+        elif n_red / n_coins >= min_board_consensus:
             board_bias = "short"
         else:
             board_bias = None
@@ -144,13 +155,13 @@ def generate_signals(board: pd.DataFrame, coins: list[str]) -> list[Signal]:
                 candidates = {c: r for c, r in rets.items() if colors[c] < 0}
                 if candidates:
                     odd_coin = min(candidates, key=candidates.get)
-                    if candidates[odd_coin] <= -MIN_ODD_ONE_OUT_DEVIATION:
+                    if candidates[odd_coin] <= -min_odd_one_out_deviation:
                         chosen = Signal(next_ts, odd_coin, "short", "odd_one_out")
             else:
                 candidates = {c: r for c, r in rets.items() if colors[c] > 0}
                 if candidates:
                     odd_coin = max(candidates, key=candidates.get)
-                    if candidates[odd_coin] >= MIN_ODD_ONE_OUT_DEVIATION:
+                    if candidates[odd_coin] >= min_odd_one_out_deviation:
                         chosen = Signal(next_ts, odd_coin, "long", "odd_one_out")
 
         if is_flush:
