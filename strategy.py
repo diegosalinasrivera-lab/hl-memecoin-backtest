@@ -43,7 +43,13 @@ from typing import Optional
 import numpy as np
 import pandas as pd
 
-from config import STRONG_MOVE_PCT, FLUSH_PCT, MAJORITY_FRACTION
+from config import (
+    STRONG_MOVE_PCT,
+    FLUSH_PCT,
+    MAJORITY_FRACTION,
+    MIN_BOARD_CONSENSUS,
+    MIN_ODD_ONE_OUT_DEVIATION,
+)
 
 
 @dataclass
@@ -89,7 +95,15 @@ def generate_signals(board: pd.DataFrame, coins: list[str]) -> list[Signal]:
 
         n_green = sum(1 for v in colors.values() if v > 0)
         n_red = n_coins - n_green
-        board_bias = "long" if n_green > n_red else ("short" if n_red > n_green else None)
+        # ajuste v2: el sesgo de tablero sólo cuenta si hay consenso fuerte
+        # (>=MIN_BOARD_CONSENSUS de las monedas del mismo color), no con
+        # una simple mayoría de 1 voto.
+        if n_green / n_coins >= MIN_BOARD_CONSENSUS:
+            board_bias = "long"
+        elif n_red / n_coins >= MIN_BOARD_CONSENSUS:
+            board_bias = "short"
+        else:
+            board_bias = None
 
         median_ret = float(np.median(list(rets.values())))
         n_strong_up = sum(1 for r in rets.values() if r >= STRONG_MOVE_PCT)
@@ -122,17 +136,22 @@ def generate_signals(board: pd.DataFrame, coins: list[str]) -> list[Signal]:
             chosen = Signal(next_ts, worst_coin, "long", "fade_strong_move")
 
         elif board_bias is not None:
-            # odd one out: moneda en contra del tablero con mayor desvío
+            # odd one out: moneda en contra del tablero con mayor desvío,
+            # pero sólo si ese desvío es >= MIN_ODD_ONE_OUT_DEVIATION
+            # (ajuste v2: filtra ruido de baja magnitud que antes
+            # generaba señal en casi cada vela).
             if board_bias == "long":
                 candidates = {c: r for c, r in rets.items() if colors[c] < 0}
                 if candidates:
                     odd_coin = min(candidates, key=candidates.get)
-                    chosen = Signal(next_ts, odd_coin, "short", "odd_one_out")
+                    if candidates[odd_coin] <= -MIN_ODD_ONE_OUT_DEVIATION:
+                        chosen = Signal(next_ts, odd_coin, "short", "odd_one_out")
             else:
                 candidates = {c: r for c, r in rets.items() if colors[c] > 0}
                 if candidates:
                     odd_coin = max(candidates, key=candidates.get)
-                    chosen = Signal(next_ts, odd_coin, "long", "odd_one_out")
+                    if candidates[odd_coin] >= MIN_ODD_ONE_OUT_DEVIATION:
+                        chosen = Signal(next_ts, odd_coin, "long", "odd_one_out")
 
         if is_flush:
             pending_bounce = True

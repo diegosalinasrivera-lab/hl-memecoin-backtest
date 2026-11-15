@@ -56,6 +56,18 @@ STRONG_MOVE_PCT = 0.015      # 1.5% en una sola vela de 15m = "sube/baja fuerte"
 FLUSH_PCT = 0.02             # 2% de caída agregada de la mayoría = "flush"
 MAJORITY_FRACTION = 0.5      # fracción de monedas para definir sesgo de tablero
 
+# --- Filtros anti-sobre-trading (ajuste v2) ---------------------------------
+# El backtest v1 operaba casi en cada vela (odd-one-out sin filtro de
+# magnitud: 4487 de 4542 señales), generando ~4200 trades en 52 días y
+# dejando que el costo de transacción se comiera cualquier edge. Dos
+# filtros para exigir señales más selectivas:
+MIN_BOARD_CONSENSUS = 0.65     # el tablero necesita >=65% de monedas del
+                                # mismo color para que el sesgo cuente
+                                # (antes: simple mayoría >50%)
+MIN_ODD_ONE_OUT_DEVIATION = 0.006  # la moneda "odd one out" debe moverse
+                                     # al menos 0.6% en contra del tablero
+                                     # para operarla (antes: sin mínimo)
+
 PAUSE_BARS_AFTER_2_STOPS = 3   # 45 min / 15 min = 3 velas
 MAX_OPEN_POSITIONS = 5
 STOP_LOSS_PCTS = [0.005, 0.01]   # 0.5% y 1% (se corre el promedio como caso base, y ambos como sensibilidad)

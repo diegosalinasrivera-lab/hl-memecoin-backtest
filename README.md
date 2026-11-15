@@ -73,11 +73,12 @@ para poder backtestearlo se tradujo a reglas mecánicas exactas (ver
   notional, no sobre el margen).
 - **Capital inicial**: 146 USD.
 
-## Resultado del backtest
+## Resultado del backtest — v1 (sin filtros)
 
-**La estrategia, tal como está especificada, pierde la enorme mayoría del
-capital en los tres escenarios de apalancamiento, en la ventana de datos
-disponible (~52 días, 2026-09-24 a 2026-11-15):**
+**La estrategia, tal como está especificada literalmente (sin filtro de
+magnitud), pierde la enorme mayoría del capital en los tres escenarios de
+apalancamiento, en la ventana de datos disponible (~52 días, 2026-09-24 a
+2026-11-15):**
 
 | Leverage | Capital final | Retorno total | Drawdown máx | # Trades | % Ganadores | % Stopped |
 |---|---|---|---|---|---|---|
@@ -85,40 +86,78 @@ disponible (~52 días, 2026-09-24 a 2026-11-15):**
 | 5x  | $0.58  | -99.6%  | -99.6%  | 4207 | 33.4% | 11.9% |
 | 25x | ~$0.00 | -100.0% | -100.0% | 4207 | 33.4% | 11.9% |
 
-(stop-loss base 0.75%; ver `output/summary_by_leverage.csv` para el detalle
-exacto y `output/robustness_*.csv` para sin-mejor-moneda / sin-mejor-día)
+### Por qué perdía tanto
 
-### Por qué pierde tanto
-
-- La regla de "odd one out" genera señal en **prácticamente cada vela**
-  (4487 de 4542 señales totales son odd-one-out puro) → la estrategia
-  entra y sale de posiciones casi 4200 veces en 52 días (~80/día). Con un
-  win rate real de ~33%, la expectativa neta por operación ya es negativa
-  **antes** de costos, y el costo de ida y vuelta (0.13% × leverage) sobre
-  cada una de esas ~4200 operaciones termina de destruir el capital. A
-  mayor leverage, el costo fijo en % también escala, por eso 25x es
-  prácticamente ruina garantizada y 3x "sólo" pierde el 96%.
+- La regla de "odd one out" generaba señal en **prácticamente cada vela**
+  (4487 de 4542 señales totales eran odd-one-out puro) → la estrategia
+  entraba y salía de posiciones casi 4200 veces en 52 días (~80/día). Con
+  un win rate real de ~33%, la expectativa neta por operación ya era
+  negativa **antes** de costos, y el costo de ida y vuelta (0.13% ×
+  leverage) sobre cada una de esas ~4200 operaciones terminaba de destruir
+  el capital.
 - El universo entero de memecoins cayó en la ventana analizada (régimen
-  "bajista" en los dos meses completos cubiertos — ver
-  `output/regime_*.csv`), lo que además sesga mal a una estrategia que
-  gran parte del tiempo está comprando el "odd one out" verde contra un
-  tablero rojo (comprando rebotes en tendencia bajista).
-- La prueba de robustez confirma que el resultado **no** depende de un
-  golpe de suerte puntual: quitando la mejor moneda o el mejor día
-  individual, el retorno total apenas cambia (sigue siendo fuertemente
-  negativo) — la pérdida está distribuida en miles de trades, no
-  concentrada.
+  "bajista" en los dos meses completos cubiertos), lo que además sesgaba
+  mal a una estrategia que gran parte del tiempo compra el "odd one out"
+  verde contra un tablero rojo (comprando rebotes en tendencia bajista).
+- La prueba de robustez confirmó que el resultado no dependía de un golpe
+  de suerte puntual: sin la mejor moneda o el mejor día, el retorno apenas
+  cambiaba — la pérdida estaba distribuida en miles de trades.
 
-### Sensibilidad de stop-loss (leverage 5x)
+### Sensibilidad de stop-loss v1 (leverage 5x)
 
 | Stop-loss | Capital final | Retorno | # Trades | % Stopped |
 |---|---|---|---|---|
 | 0.5% | $1.35 | -99.1% | 3833 | 21.2% |
 | 1.0% | $0.32 | -99.8% | 4408 | 7.3% |
 
-Un stop más ajustado (0.5%) corta pérdidas antes pero igual no evita el
-resultado catastrófico, porque el problema de fondo es la frecuencia de
-operación y el costo de transacción, no el tamaño del stop.
+## Ajuste v2: filtros anti-sobre-trading
+
+Para no "operar prácticamente cada vela", se agregaron dos filtros
+(`config.py` → `MIN_BOARD_CONSENSUS`, `MIN_ODD_ONE_OUT_DEVIATION`,
+aplicados en `strategy.py`):
+
+- **Consenso de tablero mínimo 65%** (antes: simple mayoría >50%): el
+  sesgo del tablero sólo cuenta si al menos 65% de las 23 monedas
+  cerraron del mismo color en esa vela.
+- **Desvío mínimo del odd-one-out: 0.6%**: la moneda candidata sólo se
+  opera si se movió al menos 0.6% en contra del tablero (antes: se
+  operaba cualquier desvío, sin importar cuán chico).
+
+### Resultado v2
+
+| Leverage | Capital final | Retorno total | Drawdown máx | # Trades | % Ganadores | % Stopped |
+|---|---|---|---|---|---|---|
+| 3x  | $93.08 | -36.2% | -36.5% | 537 | 31.5% | 24.8% |
+| 5x  | $68.50 | -53.1% | -53.4% | 537 | 31.5% | 24.8% |
+| 25x | $2.43  | -98.3% | -98.4% | 537 | 31.5% | 24.8% |
+
+Los filtros bajaron los trades de 4207 a 537 (-87%), y el resultado dejó
+de ser una ruina total: 3x pasó de -96% a -36%. **Pero la estrategia
+sigue perdiendo dinero en los tres escenarios.** El win rate real
+(~31%) sigue por debajo del punto de equilibrio que necesita el payoff de
+este setup (stop 0.75%, 1 vela de duración); los filtros redujeron el
+sangrado por costos de transacción, pero no cambian el problema de fondo:
+**en esta muestra (100% bajista), comprar el "odd one out" contra la
+tendencia dominante no tiene edge positivo**, aunque ahora pierde menos y
+más despacio. La prueba de robustez (sin mejor moneda / sin mejor día,
+`output/robustness_*.csv`) confirma que tampoco este resultado depende de
+un golpe de suerte puntual.
+
+### Sensibilidad de stop-loss v2 (leverage 5x)
+
+| Stop-loss | Capital final | Retorno | # Trades | % Stopped |
+|---|---|---|---|---|
+| 0.5% | $73.65 | -49.6% | 500 | 38.4% |
+| 1.0% | $59.84 | -59.0% | 544 | 17.3% |
+
+### Próximos pasos posibles (no implementados todavía)
+
+- Probar la estrategia sobre un período con régimen alcista o lateral
+  (requiere otra fuente de datos con más historia, ver limitaciones).
+- Exigir confirmación de reversión (p. ej. que la vela siguiente a la
+  señal también vaya en el sentido de la operación) antes de entrar.
+- Ampliar la duración de la posición más allá de 1 vela, o usar un
+  take-profit en vez de salir siempre al cierre de la vela siguiente.
 
 ## Cómo correrlo
 
