@@ -1,0 +1,509 @@
+<meta name="dash-one-writer">
+<style>
+  #dash-root { --dash-gutter: 0; }
+  .wrap { display: flex; flex-direction: column; gap: var(--cds-gap-xl); padding: var(--cds-pad-lg); max-width: 1100px; margin: 0 auto; }
+  h1 { font-family: var(--font-anthropic-serif); font-weight: 400; font-size: var(--cds-font-size-title); margin: 0; }
+  h2 { font-family: var(--font-anthropic-serif); font-weight: 400; font-size: var(--cds-font-size-heading); margin: 0 0 var(--cds-gap-sm) 0; }
+  .lead { font-size: var(--cds-font-size-body); color: var(--color-fg-muted); margin: 0; max-width: 65ch; }
+  .lead b { color: var(--color-fg); font-variant-numeric: tabular-nums; }
+  section { display: flex; flex-direction: column; gap: var(--cds-gap-sm); }
+  .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: var(--cds-gap-md); }
+  .card { background: var(--color-panel); border: 1px solid var(--color-border-line); border-radius: var(--cds-radius); padding: var(--cds-pad-lg); display: flex; flex-direction: column; gap: var(--cds-gap-xs); min-width: 0; }
+  .card .lev { font-size: var(--cds-font-size-caption); color: var(--color-fg-muted); text-transform: uppercase; letter-spacing: .04em; }
+  .card .big { font-family: var(--font-anthropic-serif); font-size: 2rem; font-variant-numeric: tabular-nums; }
+  .card .rows { display: grid; grid-template-columns: 1fr auto; gap: 2px var(--cds-gap-sm); font-size: var(--cds-font-size-caption); color: var(--color-fg-muted); }
+  .card .rows span:nth-child(odd) { color: var(--color-fg-muted); }
+  .card .rows span:nth-child(even) { color: var(--color-fg); font-variant-numeric: tabular-nums; text-align: right; }
+  .bad { color: var(--color-bad); }
+  .ok { color: var(--color-ok); }
+  .chart-box { position: relative; min-height: 260px; }
+  .chart-box svg { width: 100%; display: block; overflow: visible; }
+  .tooltip { position: absolute; pointer-events: none; background: var(--cds-surface-popover); border: 1px solid var(--cds-border); box-shadow: var(--cds-shadow-popover); color: var(--cds-text-secondary); border-radius: var(--cds-radius); padding: var(--cds-pad-sm); font-size: var(--cds-font-size-caption); opacity: 0; transition: opacity .1s; z-index: 5; white-space: nowrap; }
+  .legend { display: flex; gap: var(--cds-gap-md); flex-wrap: wrap; font-size: var(--cds-font-size-caption); color: var(--color-fg-muted); }
+  .legend span { display: inline-flex; align-items: center; gap: 6px; }
+  .legend i { width: 10px; height: 10px; border-radius: 2px; display: inline-block; }
+  table { border-collapse: collapse; width: 100%; font-size: var(--cds-font-size-caption); }
+  table th, table td { text-align: left; padding: var(--cds-pad-sm) var(--cds-gap-sm); border-bottom: 1px solid var(--color-border-line); }
+  table td { font-variant-numeric: tabular-nums; }
+  .table-wrap { overflow-x: auto; }
+  .note { font-size: var(--cds-font-size-caption); color: var(--color-fg-muted); max-width: 70ch; }
+  .exec-controls { display: flex; gap: var(--cds-gap-sm); align-items: center; flex-wrap: wrap; font-size: var(--cds-font-size-caption); }
+  select.dash-select { background-color: var(--color-panel); border: 1px solid var(--color-border-line); border-radius: var(--cds-radius); padding: 6px 28px 6px 10px; color: var(--color-fg); font-size: var(--cds-font-size-caption); }
+  button.pager { background: var(--color-panel); border: 1px solid var(--color-border-line); border-radius: var(--cds-radius); padding: 6px 12px; color: var(--color-fg); cursor: pointer; font-size: var(--cds-font-size-caption); }
+  button.pager:disabled { opacity: .4; cursor: default; }
+  .pos { color: var(--color-ok); }
+  .neg { color: var(--color-bad); }
+  .heat-cell text { font-size: 9px; font-variant-numeric: tabular-nums; }
+  .axis-halo { paint-order: stroke; stroke: var(--color-bg); stroke-width: 3px; stroke-linejoin: round; }
+  .warn-banner { background: color-mix(in srgb, var(--color-bad) 12%, var(--color-panel)); border: 1px solid var(--color-bad); border-radius: var(--cds-radius); padding: var(--cds-pad-md) var(--cds-pad-lg); font-size: var(--cds-font-size-body); }
+  details.notes { font-size: var(--cds-font-size-caption); color: var(--color-fg-muted); }
+</style>
+
+<div class="wrap">
+  <header section>
+    <h1>Backtest: tablero / odd one out — 23 memecoins, velas de 15m</h1>
+    <p class="lead">
+      Con <b>3x</b> de apalancamiento la estrategia termina en
+      <b data-draw="lead-capital" data-source="summary" data-field="capital_final" data-where="leverage=3">—</b> USD
+      (capital inicial $146), un retorno de
+      <b data-draw="lead-retorno" data-source="summary" data-field="retorno_total_pct" data-where="leverage=3">—</b>
+      sobre 12 meses reales de OKX. Pierde dinero en los tres apalancamientos probados y en ambos regímenes de mercado
+      (alcista y bajista) — esto es una simulación histórica, no una base para operar con dinero real.
+    </p>
+  </header>
+
+  <section class="warn-banner">
+    ⚠️ Ninguna de las configuraciones probadas (3 apalancamientos × 2 fuentes de datos × 42 combinaciones de filtros)
+    dio un resultado rentable. Ver "Barrido de filtros" más abajo.
+  </section>
+
+  <section id="kpis">
+    <h2>Resumen por apalancamiento (OKX, 12 meses)</h2>
+    <div class="cards">
+      <div class="card">
+        <span class="lev">3x</span>
+        <span class="big bad" data-draw="kpi-capital-3" data-source="summary" data-field="capital_final" data-where="leverage=3">—</span>
+        <div class="rows">
+          <span>Retorno total</span><span data-draw="kpi-retorno-3" data-source="summary" data-field="retorno_total_pct" data-where="leverage=3">—</span>
+          <span>Drawdown máx.</span><span data-draw="kpi-dd-3" data-source="summary" data-field="drawdown_maximo_pct" data-where="leverage=3">—</span>
+          <span># Trades</span><span data-draw="kpi-trades-3" data-source="summary" data-field="num_trades" data-where="leverage=3">—</span>
+          <span>% Ganadores</span><span data-draw="kpi-win-3" data-source="summary" data-field="pct_ganadores" data-where="leverage=3">—</span>
+          <span>% Stopped</span><span data-draw="kpi-stop-3" data-source="summary" data-field="pct_stopped" data-where="leverage=3">—</span>
+        </div>
+      </div>
+      <div class="card">
+        <span class="lev">5x</span>
+        <span class="big bad" data-draw="kpi-capital-5" data-source="summary" data-field="capital_final" data-where="leverage=5">—</span>
+        <div class="rows">
+          <span>Retorno total</span><span data-draw="kpi-retorno-5" data-source="summary" data-field="retorno_total_pct" data-where="leverage=5">—</span>
+          <span>Drawdown máx.</span><span data-draw="kpi-dd-5" data-source="summary" data-field="drawdown_maximo_pct" data-where="leverage=5">—</span>
+          <span># Trades</span><span data-draw="kpi-trades-5" data-source="summary" data-field="num_trades" data-where="leverage=5">—</span>
+          <span>% Ganadores</span><span data-draw="kpi-win-5" data-source="summary" data-field="pct_ganadores" data-where="leverage=5">—</span>
+          <span>% Stopped</span><span data-draw="kpi-stop-5" data-source="summary" data-field="pct_stopped" data-where="leverage=5">—</span>
+        </div>
+      </div>
+      <div class="card">
+        <span class="lev">25x</span>
+        <span class="big bad" data-draw="kpi-capital-25" data-source="summary" data-field="capital_final" data-where="leverage=25">—</span>
+        <div class="rows">
+          <span>Retorno total</span><span data-draw="kpi-retorno-25" data-source="summary" data-field="retorno_total_pct" data-where="leverage=25">—</span>
+          <span>Drawdown máx.</span><span data-draw="kpi-dd-25" data-source="summary" data-field="drawdown_maximo_pct" data-where="leverage=25">—</span>
+          <span># Trades</span><span data-draw="kpi-trades-25" data-source="summary" data-field="num_trades" data-where="leverage=25">—</span>
+          <span>% Ganadores</span><span data-draw="kpi-win-25" data-source="summary" data-field="pct_ganadores" data-where="leverage=25">—</span>
+          <span>% Stopped</span><span data-draw="kpi-stop-25" data-source="summary" data-field="pct_stopped" data-where="leverage=25">—</span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section id="equity">
+    <h2>Curva de capital (diaria, 12 meses OKX)</h2>
+    <div class="legend" data-draw="equity-legend" data-source="equity_daily"></div>
+    <div class="chart-box" style="min-height:320px">
+      <svg data-draw="equity-chart" data-source="equity_daily" role="img" aria-label="Curva de capital diaria para 3x, 5x y 25x de apalancamiento, cayendo a lo largo de 12 meses"></svg>
+      <div class="tooltip" id="equity-tooltip" style="opacity:0"></div>
+    </div>
+    <p class="note">Escala logarítmica: el capital a 25x cae por debajo de 1 centavo antes de fin de año.</p>
+  </section>
+
+  <section id="monthly">
+    <h2>Retorno mensual (leverage 3x)</h2>
+    <div class="chart-box" style="min-height:220px">
+      <svg data-draw="monthly-chart" data-source="monthly_3x" role="img" aria-label="Retorno porcentual mes a mes, mayormente negativo"></svg>
+    </div>
+  </section>
+
+  <section id="regime">
+    <h2>Resultado por régimen de mercado (leverage 3x)</h2>
+    <div class="chart-box" style="min-height:200px">
+      <svg data-draw="regime-chart" data-source="regime_3x" role="img" aria-label="PnL total agrupado por régimen alcista, bajista y sin dato"></svg>
+    </div>
+    <p class="note">De 12 meses: 9 bajistas, 3 alcistas, 0 laterales puros. La estrategia pierde dinero en ambos regímenes.</p>
+  </section>
+
+  <section id="robustness">
+    <h2>Robustez: ¿depende de un golpe de suerte?</h2>
+    <div class="table-wrap">
+      <table data-source="robustness" data-row-key="leverage">
+        <thead><tr>
+          <th data-field="leverage">Leverage</th>
+          <th data-field="retorno_total_pct">Retorno total</th>
+          <th data-field="retorno_sin_mejor_moneda_pct">Sin mejor moneda</th>
+          <th data-field="retorno_sin_mejor_dia_pct">Sin mejor día</th>
+          <th data-field="mejor_moneda">Mejor moneda</th>
+        </tr></thead>
+        <tbody data-draw="robustness-body"></tbody>
+      </table>
+    </div>
+    <p class="note">Quitar la mejor moneda o el mejor día individual no mejora el resultado — la pérdida está distribuida en miles de operaciones, no concentrada en un golpe de suerte puntual.</p>
+  </section>
+
+  <section id="sweep">
+    <h2>Barrido de filtros (42 combinaciones, leverage 5x, Hyperliquid 52 días)</h2>
+    <p class="note">Eje horizontal: consenso mínimo del tablero. Eje vertical: desvío mínimo del odd-one-out. Color y número: retorno total %.</p>
+    <div class="chart-box" style="min-height:280px">
+      <svg data-draw="sweep-heatmap" data-source="sweep" role="img" aria-label="Mapa de calor de retorno total por consenso de tablero y desvío mínimo, todo negativo"></svg>
+    </div>
+    <p class="note">La mejor combinación (consenso 50%, desvío 2.0%) igual pierde -10.5%.</p>
+  </section>
+
+  <section id="executions">
+    <h2>Ejecuciones — tiempos y resultado de cada operación</h2>
+    <div class="exec-controls">
+      <label>Filtro:
+        <select class="dash-select" data-draw="exec-filter"></select>
+      </label>
+      <span data-draw="exec-count"></span>
+      <span style="flex:1"></span>
+      <button class="pager" data-draw="exec-prev"></button>
+      <span data-draw="exec-page"></span>
+      <button class="pager" data-draw="exec-next"></button>
+    </div>
+    <div class="table-wrap">
+      <table data-source="executions" data-row-key="entry_ts">
+        <thead><tr>
+          <th data-field="entry_ts">Entrada</th>
+          <th data-field="exit_ts">Salida</th>
+          <th data-field="coin">Moneda</th>
+          <th data-field="side">Lado</th>
+          <th data-field="reason">Motivo</th>
+          <th data-field="stopped_out">Stop</th>
+          <th data-field="pnl_usd_3x">PnL 3x</th>
+          <th data-field="pnl_usd_5x">PnL 5x</th>
+          <th data-field="pnl_usd_25x">PnL 25x</th>
+        </tr></thead>
+        <tbody data-draw="exec-body"></tbody>
+      </table>
+    </div>
+    <p class="note">4723 operaciones totales (OKX, 12 meses, leverage 3x como referencia de entrada/salida — el PnL cambia por leverage, el resto de la operación es la misma).</p>
+  </section>
+
+  <details class="notes">
+    <summary>Notas y limitaciones</summary>
+    <p>Hyperliquid (API pública) sólo sirve ~52 días de velas de 15m sin importar el rango pedido; la ventana de 12 meses usa OKX (API pública, history-candles). BROCCOLI714, BANANAS31, DOGS, GOAT y MELANIA no tienen contrato equivalente en estas fuentes y se reemplazaron por otras memecoins líquidas. Comisión 0.035% + slippage 0.03% por lado, capital inicial $146, máximo 5 posiciones simultáneas, stop 0.75%, pausa de 45 min tras 2 stops seguidos. Código completo en github.com/diegosalinasrivera-lab/hl-memecoin-backtest.</p>
+  </details>
+</div>
+
+<script>
+(function () {
+  const fmtUSD = (v) => isFinite(v) ? '$' + Number(v).toLocaleString('en-US', {maximumFractionDigits: 2}) : '—';
+  const fmtPct = (v) => isFinite(v) ? Number(v).toFixed(1) + '%' : '—';
+  const fmtInt = (v) => isFinite(v) ? Number(v).toLocaleString('en-US') : '—';
+  const toNum = (v) => v === null || v === undefined || v === '' ? NaN : Number(v);
+  const parseTs = (s) => d3.utcParse('%Y-%m-%d %H:%M:%S%Z')(s) || d3.utcParse('%Y-%m-%dT%H:%M:%S%Z')(s) || new Date(s);
+
+  function thinXLabels(svg) {
+    const texts = svg.selectAll('g.tick text').nodes();
+    let lastRight = -Infinity;
+    texts.forEach((node) => {
+      const box = node.getBBox();
+      const left = box.x;
+      if (left < lastRight + 6) {
+        node.setAttribute('hidden', 'true');
+      } else {
+        lastRight = box.x + box.width;
+      }
+    });
+  }
+
+  function rowWhere(rows, where) {
+    if (!rows) return null;
+    const [k, v] = where.split('=');
+    return rows.find(r => String(r[k]) === v) || null;
+  }
+
+  // ---- KPIs (genérico: cualquier elemento con data-draw que tenga data-source/field/where) ----
+  document.querySelectorAll('[data-draw][data-source][data-field]').forEach((el) => {
+    const name = el.getAttribute('data-draw');
+    dash.draw(name, (node) => {
+      const g = dash.data(node.getAttribute('data-source'));
+      if (g.status !== 'ok') { node.textContent = '—'; return; }
+      const where = node.getAttribute('data-where');
+      const field = node.getAttribute('data-field');
+      const row = where ? rowWhere(g.data, where) : (g.data[0] || null);
+      if (!row) { node.textContent = '—'; return; }
+      let val = row[field];
+      if (field.includes('pct')) node.textContent = fmtPct(toNum(val));
+      else if (field === 'capital_final') node.textContent = fmtUSD(toNum(val));
+      else if (field === 'num_trades') node.textContent = fmtInt(toNum(val));
+      else node.textContent = val;
+      if (field.includes('pct') || field === 'capital_final') {
+        const n = toNum(val);
+        node.classList.remove('pos', 'neg');
+        if (isFinite(n)) node.classList.add(n < 0 ? 'neg' : 'pos');
+      }
+    });
+  });
+
+  // ---- Curva de capital ----
+  dash.draw('equity-legend', (el) => {
+    const labels = [['3x', dash.colors[0]], ['5x', dash.colors[1]], ['25x', dash.colors[2]]];
+    el.replaceChildren(...labels.map(([l, c]) => {
+      const s = document.createElement('span');
+      const i = document.createElement('i');
+      i.style.background = c;
+      s.appendChild(i);
+      s.appendChild(document.createTextNode(l));
+      return s;
+    }));
+  });
+
+  dash.draw('equity-chart', {
+    mount(el) { return { svg: d3.select(el) }; },
+    update(el, made) {
+      const g = dash.data('equity_daily');
+      const svg = made.svg;
+      svg.selectAll('*').remove();
+      if (g.status !== 'ok' || !g.data.length) return;
+      const data = g.data.map(r => ({
+        date: d3.utcParse('%Y-%m-%d')(r.ts),
+        v3: Math.max(toNum(r.equity_3x), 0.001),
+        v5: Math.max(toNum(r.equity_5x), 0.001),
+        v25: Math.max(toNum(r.equity_25x), 0.001),
+      }));
+      const width = el.clientWidth || 800, height = 320;
+      const margin = { top: 16, right: 16, bottom: 28, left: 56 };
+      svg.attr('viewBox', `0 0 ${width} ${height}`);
+      const x = d3.scaleUtc().domain(d3.extent(data, d => d.date)).range([margin.left, width - margin.right]);
+      const y = d3.scaleLog().domain([0.001, 150]).range([height - margin.bottom, margin.top]);
+      const axisColor = 'var(--cds-chart-axis)', gridColor = 'var(--cds-chart-grid)', textColor = 'var(--cds-text-secondary)';
+      const eqXAxis = svg.append('g')
+        .attr('transform', `translate(0,${height - margin.bottom})`)
+        .call(d3.axisBottom(x).ticks(6))
+        .call(g => g.selectAll('text').attr('fill', textColor).attr('font-size', 'var(--cds-font-size-caption)'))
+        .call(g => g.selectAll('line,path').attr('stroke', axisColor));
+      thinXLabels(eqXAxis);
+      svg.append('g')
+        .attr('transform', `translate(${margin.left},0)`)
+        .call(d3.axisLeft(y).tickValues([0.001, 0.01, 0.1, 1, 10, 150]).tickFormat(v => v >= 1 ? '$' + v : '$' + v.toFixed(3)))
+        .call(g => g.selectAll('text').attr('fill', textColor).attr('font-size', 'var(--cds-font-size-caption)'))
+        .call(g => g.selectAll('line,path').attr('stroke', axisColor));
+      svg.append('line').attr('x1', margin.left).attr('x2', width - margin.right)
+        .attr('y1', y(146)).attr('y2', y(146)).attr('stroke', gridColor).attr('stroke-dasharray', '3,3');
+      const keys = ['v3', 'v5', 'v25'];
+      keys.forEach((k, i) => {
+        const line = d3.line().x(d => x(d.date)).y(d => y(d[k]));
+        svg.append('path').datum(data).attr('d', line).attr('fill', 'none')
+          .attr('stroke', dash.colors[i]).attr('stroke-width', 2);
+      });
+      const tooltip = el.parentElement.querySelector('#equity-tooltip');
+      const focus = svg.append('g').style('display', 'none');
+      keys.forEach((k, i) => focus.append('circle').attr('r', 3.5).attr('fill', dash.colors[i]).attr('class', 'f-' + k));
+      svg.append('rect').attr('x', margin.left).attr('y', margin.top)
+        .attr('width', width - margin.left - margin.right).attr('height', height - margin.top - margin.bottom)
+        .attr('fill', 'transparent')
+        .on('mousemove', (event) => {
+          const [mx] = d3.pointer(event);
+          const date = x.invert(mx);
+          const bisect = d3.bisector(d => d.date).left;
+          const idx = Math.min(data.length - 1, Math.max(0, bisect(data, date)));
+          const d = data[idx];
+          focus.style('display', null);
+          keys.forEach(k => focus.select('.f-' + k).attr('cx', x(d.date)).attr('cy', y(d[k])));
+          tooltip.style.opacity = 1;
+          tooltip.style.left = Math.min(width - 160, x(d.date) + 10) + 'px';
+          tooltip.style.top = (y(d.v3) - 40) + 'px';
+          tooltip.innerHTML = '';
+          const dateLine = document.createElement('div');
+          dateLine.textContent = d3.utcFormat('%Y-%m-%d')(d.date);
+          tooltip.appendChild(dateLine);
+          [['3x', d.v3], ['5x', d.v5], ['25x', d.v25]].forEach(([l, v]) => {
+            const row = document.createElement('div');
+            row.textContent = l + ': ' + fmtUSD(v);
+            tooltip.appendChild(row);
+          });
+        })
+        .on('mouseleave', () => { focus.style('display', 'none'); tooltip.style.opacity = 0; });
+    }
+  });
+
+  // ---- Retorno mensual ----
+  dash.draw('monthly-chart', {
+    mount(el) { return { svg: d3.select(el) }; },
+    update(el, made) {
+      const g = dash.data('monthly_3x');
+      const svg = made.svg;
+      svg.selectAll('*').remove();
+      if (g.status !== 'ok' || !g.data.length) return;
+      const monthFmt = d3.utcFormat('%b %y');
+      const monthParse = d3.utcParse('%Y-%m-%d');
+      const data = g.data.map(r => ({ mes: r.mes.slice(0, 7), label: monthFmt(monthParse(r.mes.slice(0, 10))), v: toNum(r.retorno_mes_pct) })).filter(d => isFinite(d.v));
+      const width = el.clientWidth || 800, height = 220;
+      const margin = { top: 10, right: 16, bottom: 36, left: 48 };
+      svg.attr('viewBox', `0 0 ${width} ${height}`);
+      const x = d3.scaleBand().domain(data.map(d => d.mes)).range([margin.left, width - margin.right]).padding(0.25);
+      const y = d3.scaleLinear().domain(d3.extent(data, d => d.v)).nice().range([height - margin.bottom, margin.top]);
+      const textColor = 'var(--cds-text-secondary)', axisColor = 'var(--cds-chart-axis)';
+      const labelByKey = Object.fromEntries(data.map(d => [d.mes, d.label]));
+      const xAxisG = svg.append('g').attr('transform', `translate(0,${y(0)})`)
+        .call(d3.axisBottom(x).tickFormat(d => labelByKey[d]))
+        .call(g => g.selectAll('text').attr('fill', textColor).attr('font-size', 'var(--cds-font-size-caption)'))
+        .call(g => g.selectAll('line,path').attr('stroke', axisColor));
+      thinXLabels(xAxisG);
+      svg.append('g').attr('transform', `translate(${margin.left},0)`)
+        .call(d3.axisLeft(y).ticks(5).tickFormat(v => v + '%'))
+        .call(g => g.selectAll('text').attr('fill', textColor).attr('font-size', 'var(--cds-font-size-caption)'))
+        .call(g => g.selectAll('line,path').attr('stroke', axisColor));
+      svg.selectAll('rect.bar').data(data).join('rect').attr('class', 'bar')
+        .attr('x', d => x(d.mes)).attr('width', x.bandwidth())
+        .attr('y', d => Math.min(y(0), y(d.v))).attr('height', d => Math.abs(y(d.v) - y(0)))
+        .attr('fill', d => d.v >= 0 ? 'var(--color-ok)' : 'var(--color-bad)');
+    }
+  });
+
+  // ---- Régimen ----
+  dash.draw('regime-chart', {
+    mount(el) { return { svg: d3.select(el) }; },
+    update(el, made) {
+      const g = dash.data('regime_3x');
+      const svg = made.svg;
+      svg.selectAll('*').remove();
+      if (g.status !== 'ok' || !g.data.length) return;
+      const order = { alcista: 0, bajista: 1, 'N/D': 2 };
+      const data = g.data.map(r => ({ regimen: r.regimen, v: toNum(r.pnl_total), n: toNum(r.num_trades) }))
+        .sort((a, b) => (order[a.regimen] ?? 9) - (order[b.regimen] ?? 9));
+      const width = el.clientWidth || 800, height = 210;
+      const margin = { top: 10, right: 16, bottom: 46, left: 48 };
+      svg.attr('viewBox', `0 0 ${width} ${height}`);
+      const x = d3.scaleBand().domain(data.map(d => d.regimen)).range([margin.left, width - margin.right]).padding(0.35);
+      const y = d3.scaleLinear().domain([Math.min(0, d3.min(data, d => d.v)), 0]).nice().range([height - margin.bottom, margin.top]);
+      const textColor = 'var(--cds-text-secondary)', axisColor = 'var(--cds-chart-axis)';
+      svg.selectAll('rect.bar').data(data).join('rect').attr('class', 'bar')
+        .attr('x', d => x(d.regimen)).attr('width', x.bandwidth())
+        .attr('y', d => y(0)).attr('height', d => Math.max(1, y(d.v) - y(0)))
+        .attr('fill', 'var(--color-bad)');
+      svg.append('g').attr('transform', `translate(${margin.left},0)`).call(d3.axisLeft(y).ticks(4).tickFormat(v => '$' + v))
+        .call(g => g.selectAll('text').attr('fill', textColor).attr('font-size', 'var(--cds-font-size-caption)'))
+        .call(g => g.selectAll('line,path').attr('stroke', axisColor));
+      // el eje de categorías se dibuja al final, por encima de las barras, para
+      // que "bajista" (barra muy alta) no tape su propia etiqueta; halo claro
+      // detrás del texto para que se lea igual sobre la barra roja o el fondo.
+      svg.append('g').attr('transform', `translate(0,${y(0)})`).call(d3.axisBottom(x))
+        .call(g => g.selectAll('text').attr('fill', textColor).attr('font-size', 'var(--cds-font-size-caption)')
+          .attr('class', 'axis-halo'))
+        .call(g => g.selectAll('line,path').attr('stroke', axisColor));
+      svg.selectAll('text.lab-n').data(data).join('text').attr('class', 'lab-n')
+        .attr('x', d => x(d.regimen) + x.bandwidth() / 2).attr('y', height - 20)
+        .attr('text-anchor', 'middle').attr('fill', textColor).attr('font-size', 'var(--cds-font-size-caption)')
+        .text(d => '$' + d.v.toFixed(0));
+      svg.selectAll('text.lab-n2').data(data).join('text').attr('class', 'lab-n2')
+        .attr('x', d => x(d.regimen) + x.bandwidth() / 2).attr('y', height - 6)
+        .attr('text-anchor', 'middle').attr('fill', textColor).attr('font-size', 'var(--cds-font-size-caption)')
+        .text(d => d.n + ' trades');
+    }
+  });
+
+  // ---- Robustez (tabla) ----
+  dash.draw('robustness-body', (tbody) => {
+    const g = dash.data('robustness');
+    if (g.status !== 'ok') return;
+    const fmt = (v) => fmtPct(toNum(v));
+    const rows = g.data.slice().sort((a, b) => toNum(a.leverage) - toNum(b.leverage));
+    d3.select(tbody).selectAll('tr').data(rows, d => d.leverage).join('tr')
+      .attr('data-key', d => d.leverage)
+      .html(d => `<td>${d.leverage}x</td><td class="neg">${fmt(d.retorno_total_pct)}</td><td class="neg">${fmt(d.retorno_sin_mejor_moneda_pct)}</td><td class="neg">${fmt(d.retorno_sin_mejor_dia_pct)}</td><td>${d.mejor_moneda}</td>`);
+  });
+
+  // ---- Barrido de filtros (heatmap) ----
+  dash.draw('sweep-heatmap', {
+    mount(el) { return { svg: d3.select(el) }; },
+    update(el, made) {
+      const g = dash.data('sweep');
+      const svg = made.svg;
+      svg.selectAll('*').remove();
+      if (g.status !== 'ok' || !g.data.length) return;
+      const data = g.data.map(r => ({
+        c: toNum(r.min_board_consensus), d: toNum(r.min_odd_one_out_deviation), v: toNum(r.retorno_total_pct)
+      }));
+      const consensusVals = Array.from(new Set(data.map(d => d.c))).sort((a, b) => a - b);
+      const deviationVals = Array.from(new Set(data.map(d => d.d))).sort((a, b) => a - b);
+      const width = el.clientWidth || 800, height = 300;
+      const margin = { top: 20, right: 16, bottom: 36, left: 56 };
+      svg.attr('viewBox', `0 0 ${width} ${height}`);
+      const x = d3.scaleBand().domain(consensusVals).range([margin.left, width - margin.right]).padding(0.04);
+      const y = d3.scaleBand().domain(deviationVals).range([margin.top, height - margin.bottom]).padding(0.04);
+      const color = d3.scaleLinear().domain([d3.min(data, d => d.v), 0]).range(['#b23b3b', '#e8c77a']);
+      const textColor = 'var(--cds-text-secondary)', axisColor = 'var(--cds-chart-axis)';
+      const hmXAxis = svg.append('g').attr('transform', `translate(0,${height - margin.bottom})`)
+        .call(d3.axisBottom(x).tickFormat(v => (v * 100).toFixed(0) + '%'))
+        .call(g => g.selectAll('text').attr('fill', textColor).attr('font-size', 'var(--cds-font-size-caption)'))
+        .call(g => g.selectAll('line,path').attr('stroke', axisColor));
+      thinXLabels(hmXAxis);
+      svg.append('g').attr('transform', `translate(${margin.left},0)`)
+        .call(d3.axisLeft(y).tickFormat(v => (v * 100).toFixed(1) + '%'))
+        .call(g => g.selectAll('text').attr('fill', textColor).attr('font-size', 'var(--cds-font-size-caption)'))
+        .call(g => g.selectAll('line,path').attr('stroke', axisColor));
+      const cell = svg.selectAll('g.heat-cell').data(data).join('g').attr('class', 'heat-cell');
+      cell.append('rect')
+        .attr('x', d => x(d.c)).attr('y', d => y(d.d))
+        .attr('width', x.bandwidth()).attr('height', y.bandwidth())
+        .attr('fill', d => color(d.v));
+      // el número sólo entra si la celda es suficientemente ancha; si no, el color solo
+      // ya transmite la magnitud (todo negativo), ver nota debajo del gráfico.
+      if (x.bandwidth() >= 40) {
+        cell.append('text')
+          .attr('x', d => x(d.c) + x.bandwidth() / 2).attr('y', d => y(d.d) + y.bandwidth() / 2 + 3)
+          .attr('text-anchor', 'middle').attr('fill', '#1a1a1a')
+          .text(d => d.v.toFixed(0) + '%');
+      }
+    }
+  });
+
+  // ---- Ejecuciones: filtro + paginado ----
+  const execState = { page: 0, filter: 'all', pageSize: 25 };
+
+  function execRows() {
+    const g = dash.data('executions');
+    if (g.status !== 'ok') return [];
+    let rows = g.data;
+    if (execState.filter === 'stopped') rows = rows.filter(r => r.stopped_out === 'True');
+    if (execState.filter === 'win') rows = rows.filter(r => toNum(r.pnl_usd_3x) > 0);
+    if (execState.filter === 'loss') rows = rows.filter(r => toNum(r.pnl_usd_3x) <= 0);
+    return rows;
+  }
+
+  dash.draw('exec-filter', (sel) => {
+    const opts = [['all', 'Todas'], ['win', 'Ganadoras (3x)'], ['loss', 'Perdedoras (3x)'], ['stopped', 'Con stop']];
+    sel.replaceChildren(...opts.map(([v, l]) => new Option(l, v)));
+    sel.value = execState.filter;
+    sel.onchange = () => { execState.filter = sel.value; execState.page = 0; dash.draw('exec-body'); dash.draw('exec-page'); dash.draw('exec-count'); };
+  });
+
+  dash.draw('exec-prev', (btn) => {
+    btn.textContent = '◀ Anterior';
+    btn.onclick = () => { if (execState.page > 0) { execState.page--; dash.draw('exec-body'); dash.draw('exec-page'); } };
+  });
+  dash.draw('exec-next', (btn) => {
+    btn.textContent = 'Siguiente ▶';
+    btn.onclick = () => {
+      const total = execRows().length, maxPage = Math.max(0, Math.ceil(total / execState.pageSize) - 1);
+      if (execState.page < maxPage) { execState.page++; dash.draw('exec-body'); dash.draw('exec-page'); }
+    };
+  });
+
+  dash.draw('exec-count', (el) => {
+    const n = execRows().length;
+    el.textContent = fmtInt(n) + ' operaciones';
+  });
+
+  dash.draw('exec-page', (el) => {
+    const total = execRows().length, maxPage = Math.max(0, Math.ceil(total / execState.pageSize) - 1);
+    el.textContent = `Página ${execState.page + 1} de ${maxPage + 1}`;
+    const prev = document.querySelector('[data-draw="exec-prev"]');
+    const next = document.querySelector('[data-draw="exec-next"]');
+    if (prev) prev.disabled = execState.page <= 0;
+    if (next) next.disabled = execState.page >= maxPage;
+  });
+
+  dash.draw('exec-body', (tbody) => {
+    const rows = execRows();
+    const start = execState.page * execState.pageSize;
+    const page = rows.slice(start, start + execState.pageSize);
+    const fmtTs = (s) => (s || '').replace('T', ' ').replace('+00:00', '').slice(0, 16);
+    const pnlCell = (v) => { const n = toNum(v); return `<span class="${n >= 0 ? 'pos' : 'neg'}">${fmtUSD(n)}</span>`; };
+    d3.select(tbody).selectAll('tr').data(page, d => d.entry_ts).join('tr')
+      .attr('data-key', d => d.entry_ts)
+      .html(d => `<td>${fmtTs(d.entry_ts)}</td><td>${fmtTs(d.exit_ts)}</td><td>${d.coin}</td><td>${d.side}</td><td>${d.reason}</td><td>${d.stopped_out === 'True' ? 'Sí' : 'No'}</td><td>${pnlCell(d.pnl_usd_3x)}</td><td>${pnlCell(d.pnl_usd_5x)}</td><td>${pnlCell(d.pnl_usd_25x)}</td>`);
+  });
+})();
+</script>
